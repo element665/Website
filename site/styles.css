@@ -185,24 +185,21 @@ h4 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0;
-  border: 1px solid var(--line);
-  color: var(--text);
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
   background: transparent;
+  color: var(--text);
 }
 
 .social-link:hover {
-  color: #fff;
-  background: #111;
-  border-color: #111;
-  text-decoration: none;
+  background: transparent;
+  color: #111;
 }
 
 .social-link svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.5rem;
+  height: 1.5rem;
   fill: currentColor;
 }
 
