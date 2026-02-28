@@ -102,7 +102,7 @@ COPY site/ /usr/share/nginx/html/
 - Deployment is deterministic and reproducible
 - Eliminates an entire class of runtime configuration drift
 
-This is how static content ships in serious production pipelines.
+I chose this to simulate how static content ships in real production pipelines.
 
 ---
 
@@ -119,8 +119,6 @@ Images are built and published as multi-arch manifests, not single-platform bina
 Running Kubernetes for a static site is unusual. That's the point.
 
 The goal isn't to use the right tool for the simplest job — it's to **practice the deployment patterns, operational workflows, and failure modes** that appear constantly in production environments. The cluster can be destroyed and rebuilt from scratch with no data loss and no manual steps.
-
-This is infrastructure that earns its own existence.
 
 ---
 
@@ -147,8 +145,7 @@ Real infrastructure work happens inside real budget constraints. Choosing cost-a
 ├── site/                   # Static site content (HTML, CSS, media)
 ├── Dockerfile              # NGINX image — bakes in all assets at build time
 ├── k8s/
-│   ├── deployment.yaml     # 2-replica NGINX deployment
-│   └── service.yaml        # Internal service definition
+│   └── pr_site.yaml        # Kubernetes service & deployment configuration
 └── README.md
 ```
 
