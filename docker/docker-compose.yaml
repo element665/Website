@@ -1,0 +1,7 @@
+services:
+  site:
+    container_name: site
+    image: element665/site:latest
+    ports:
+      - "80:80"
+    restart: unless-stopped
