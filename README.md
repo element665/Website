@@ -186,6 +186,5 @@ The portfolio it hosts shows where I came from. The infrastructure it runs on sh
 
 **Built from scratch · No tutorial · Actively maintained**
 
-*MIT License*
 
 </div>
