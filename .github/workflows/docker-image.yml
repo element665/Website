@@ -25,5 +25,22 @@ jobs:
     - name: Build and Push
       run: |
         TAG=$(date +%s)
-        docker build . --file Dockerfile --tag element665/website:$TAG
+        docker build . --file Dockerfile --tag element665/website:$TAG --tag element665/website:latest
         docker push element665/website:$TAG
+        docker push element665/website:latest
+
+    - name: Setup Tailscale
+      uses: tailscale/github-action@v2
+      with:
+        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+    - name: Deploy to web server
+      uses: appleboy/ssh-action@v1
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        script: |
+          cd /home/webadmin/Website/docker/docker-compose.yaml
+          docker compose pull
+          docker compose up -d
