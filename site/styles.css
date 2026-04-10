@@ -170,9 +170,13 @@ h4 {
   transform: scale(1.015);
 }
 
+.list {
+  text-align: center;
+}
+
 .list ul {
-  margin: 0;
-  padding-left: 1.2rem;
+  list-style-position: inside;
+  padding-left: 0;
 }
 
 .site-footer {
