@@ -244,9 +244,16 @@ h4 {
   }
 }
 
+.card-gear {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
 .card-image {
   display: block;
   width: 100%;
-  height: auto;
-  margin-bottom: 1rem;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
 }
