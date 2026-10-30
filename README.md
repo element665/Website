@@ -156,10 +156,10 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 |---|---|
 | Workload type | Docker Compose service |
 | Image strategy | Fully baked, versioned tags |
-| External access | Cloudflare Tunnel |
+| External access | Cloudflare Tunnel (`cloudflared` runs in the same Compose stack; NGINX publishes no host port) |
 | Remote access | Tailscale (WireGuard overlay network) |
 | State | Stateless |
-| Secrets required | None at runtime |
+| Secrets required | Tunnel token in `tunnel.env` on the server (git-ignored, never in the image) |
 
 ---
 
@@ -181,7 +181,7 @@ The server is never exposed to the public internet at any point in this process.
 
 ## Roadmap
 
-- [ ] Run `cloudflared` as a Compose service alongside NGINX
+- [x] Run `cloudflared` as a Compose service alongside NGINX
 - [ ] Add multi-architecture image builds for ARM compatibility
 - [ ] GitOps-style deployment workflow
 - [ ] Automated rollback on failed health check post-deploy
