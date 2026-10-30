@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Build and Deploy
 
 on:
   push:
@@ -6,47 +6,110 @@ on:
     paths:
       - 'site/**'
       - 'Dockerfile'
+      - 'default.conf'
+      - 'scripts/**'
+      - '.dockerignore'
   pull_request:
     branches: [ "main" ]
     paths:
       - 'site/**'
       - 'Dockerfile'
+      - 'default.conf'
+      - 'scripts/**'
+      - '.dockerignore'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per ref. A newer PR push cancels the older PR run, but a deploy on main is never cancelled midway.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
-
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
+      - uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}  
+      - name: Build image (local, for testing)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: website:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-    - name: Build and Push
-      run: |
-        TAG=$(date +%s)
-        docker build . --file Dockerfile --tag element665/website:$TAG --tag element665/website:latest
-        docker push element665/website:$TAG
-        docker push element665/website:latest
+      - name: Smoke test
+        run: |
+          docker run -d --name site-test -p 127.0.0.1:8080:80 website:test
+          sh scripts/smoke-test.sh http://127.0.0.1:8080
 
-    - name: Setup Tailscale
-      uses: tailscale/github-action@v2
-      with:
-        authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker logs site-test || true
 
-    - name: Deploy to web server
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          cd /home/webadmin/Website/docker/
-          docker compose pull
-          docker compose up -d
+      # Everything below runs only for pushes to main (and manual runs on main). Pull requests stop above.
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push image (tagged with the commit SHA and latest)
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            element665/website:${{ github.sha }}
+            element665/website:latest
+          cache-from: type=gha
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Deploy to web server
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: IMAGE_TAG
+          script: |
+            set -eu
+            cd /home/webadmin/Website/docker/
+
+            # remember what is running now so we can go back to it
+            PREV=$(sed -n 's/^IMAGE_TAG=//p' .env 2>/dev/null || true)
+            echo "IMAGE_TAG=${IMAGE_TAG}" > .env
+
+            docker compose pull
+            if docker compose up -d --wait; then
+              echo "Deployed ${IMAGE_TAG}"
+              # keep the last week of images around for quick rollbacks, drop the rest
+              docker image prune -af --filter "until=168h"
+            else
+              echo "Health check failed for ${IMAGE_TAG}" >&2
+              if [ -n "${PREV}" ]; then
+                echo "Rolling back to ${PREV}" >&2
+                echo "IMAGE_TAG=${PREV}" > .env
+                docker compose up -d --wait || true
+              fi
+              exit 1
+            fi

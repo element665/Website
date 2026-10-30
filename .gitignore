@@ -1,1 +1,6 @@
 .DS_Store
+
+# Runtime config that lives on the server only (written by CI / created by hand)
+.env
+*.env
+__pycache__/
