@@ -140,8 +140,11 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 ```
 .
 ├── site/                   # Static site content (HTML, CSS, media)
-├── Dockerfile              # NGINX image — bakes in all assets at build time
-├── docker-compose.yml      # Compose service definition
+├── scripts/                # Image optimizer (build stage) and post-build smoke test
+├── default.conf            # NGINX server config (security headers, caching)
+├── Dockerfile              # Multi-stage build: optimize images, then bake into NGINX
+├── docker/
+│   └── docker-compose.yaml # Compose service definition (lives on the server too)
 └── README.md
 ```
 
@@ -164,10 +167,13 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 
 Every push to `main` triggers a GitHub Actions workflow that:
 
-1. Builds a new Docker image with a unique timestamp tag
-2. Pushes the image to Docker Hub
-3. Connects the runner to the private Tailscale network
-4. SSHs into the home server and runs `docker compose pull && docker compose up -d`
+1. Builds the Docker image (a build stage downsizes the photos; originals stay untouched in git)
+2. Smoke-tests the running container: security headers are present on real pages, the CSP allows the embedded video players, and cache headers are sane
+3. Pushes the image to Docker Hub, tagged with the git commit SHA (and `latest`)
+4. Connects the runner to the private Tailscale network
+5. SSHs into the home server, pins the new SHA, and runs `docker compose pull && docker compose up -d --wait`, rolling back to the previous SHA if the health check fails
+
+Pull requests run steps 1-2 only. They never push an image or deploy.
 
 The server is never exposed to the public internet at any point in this process.
 

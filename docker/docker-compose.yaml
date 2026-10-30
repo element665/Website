@@ -1,7 +1,20 @@
 services:
   site:
     container_name: site
-    image: element665/website:latest
+    # CI writes IMAGE_TAG=<git sha> to .env next to this file on every deploy.
+    # To roll back by hand: set IMAGE_TAG in .env to an older SHA and run `docker compose up -d`.
+    image: element665/website:${IMAGE_TAG:-latest}
     ports:
-      - "80:80"
+      - "80:80"   # still needed while cloudflared runs in a separate LXC; drop once it joins this stack
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
