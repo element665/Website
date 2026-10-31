@@ -29,20 +29,26 @@ curl -s localhost:9100/metrics | head -3
 
 Replace `<PROM_IP>` with the address Prometheus scrapes from.
 
-`node_exporter` runs on the host, so the normal INPUT firewall applies. Allow Prometheus in the same way you allowed your other rules:
+**Port 9100 (`node_exporter`)** runs on the host, so the host firewall applies. With ufw:
 
 ```bash
-sudo iptables -I INPUT -p tcp -s <PROM_IP> --dport 9100 -j ACCEPT
+sudo ufw allow from <PROM_IP> to any port 9100 proto tcp
 ```
 
-Ports 2000 and 9113 are published by Docker. **Docker-published ports bypass the host's INPUT rules**, so an INPUT rule will neither allow nor block them. The place for rules about them is the `DOCKER-USER` chain:
+**Ports 2000 and 9113** are published by Docker, and **Docker-published ports bypass the host's INPUT rules, and therefore ufw**: without extra rules they are open to the whole LAN. The place for rules about them is Docker's `DOCKER-USER` chain, which only exists once Docker is running and is not managed by ufw. `metrics-firewall.sh` adds the rules (idempotently) and `metrics-firewall.service` runs it after Docker starts, so they survive reboots and Docker restarts:
 
 ```bash
-sudo iptables -I DOCKER-USER ! -s <PROM_IP> -p tcp -m conntrack --ctorigdstport 2000 --ctdir ORIGINAL -j DROP
-sudo iptables -I DOCKER-USER ! -s <PROM_IP> -p tcp -m conntrack --ctorigdstport 9113 --ctdir ORIGINAL -j DROP
+cd /home/webadmin/Website && git pull          # CI also does this on every deploy
+sudo install -m 755 monitoring/metrics-firewall.sh /usr/local/sbin/metrics-firewall.sh
+sudo install -m 644 monitoring/metrics-firewall.service /etc/systemd/system/metrics-firewall.service
+echo 'PROM_IP=<PROM_IP>' | sudo tee /etc/default/metrics-firewall      # kept out of the repo
+sudo systemctl daemon-reload
+sudo systemctl enable --now metrics-firewall
 ```
 
-Make them survive a reboot the same way you persisted your existing rules. The metrics contain nothing sensitive (counters and gauges), so on a trusted home LAN you can skip the `DOCKER-USER` rules, but then any device on the LAN can read them.
+Check it from any other device on the LAN: `curl -m 5 http://<WEB_VM_IP>:2000/metrics` should time out, while Prometheus's targets page still shows everything `UP`. The unit and script are copied with `install` (root-owned) on purpose, so that nothing running as root at boot is writable by the deploy user. After changing the script, copy it again and run `sudo systemctl restart metrics-firewall`.
+
+The metrics are counters and gauges, nothing sensitive, so on a trusted home LAN skipping this is a defensible choice. It just leaves two ports readable by every device on the network.
 
 ### 3. Deploy the compose change
 

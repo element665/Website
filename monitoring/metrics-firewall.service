@@ -1,0 +1,15 @@
+[Unit]
+Description=Restrict Docker-published metrics ports to Prometheus
+Documentation=https://github.com/element665/Website/blob/main/monitoring/README.md
+After=docker.service
+Requires=docker.service
+# re-apply whenever Docker is restarted
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/metrics-firewall.sh
+
+[Install]
+WantedBy=multi-user.target
