@@ -50,18 +50,22 @@ This is a career-transition project. It is also a production system I actively d
                   └───────┬────────┘
                           │ Encrypted tunnel (outbound only)
                           ▼
-            ┌─────────────────────────┐
-            │      Home Server        │  ← Private. Never directly exposed.
-            │                         │
-            │  ┌───────────────────┐  │
-            │  │  Docker Compose   │  │
-            │  └────────┬──────────┘  │
-            │           │             │
-            │        ┌──┴───┐         │
-            │        │ NGINX│         │  ← Static assets baked in
-            │        │      │         │
-            │        └──────┘         │
-            └─────────────────────────┘
+            ┌─────────────────────────────────┐
+            │           Home Server           │  ← Private. Never directly exposed.
+            │                                 │
+            │  ┌───────────────────────────┐  │
+            │  │       Docker Compose      │  │
+            │  │                           │  │
+            │  │    ┌─────────────────┐    │  │
+            │  │    │   cloudflared   │    │  │  ← Opens the tunnel (outbound only)
+            │  │    └────────┬────────┘    │  │
+            │  │             │             │  │
+            │  │             ▼             │  │
+            │  │    ┌─────────────────┐    │  │
+            │  │    │      NGINX      │    │  │  ← Static assets baked in
+            │  │    └─────────────────┘    │  │
+            │  └───────────────────────────┘  │
+            └─────────────────────────────────┘
 ```
 
 **Traffic never reaches the server from the public internet.** The tunnel is outbound-initiated, meaning the server has no open inbound ports. This is zero-trust networking applied at the infrastructure layer — not bolted on as an afterthought.
@@ -104,12 +108,12 @@ Content is copied into the image at build time. No volume mounts, no runtime fil
 
 ```dockerfile
 # Assets baked in — not mounted at runtime
-COPY site/ /usr/share/nginx/html/
+COPY --from=assemble /out/ /usr/share/nginx/html/
 ```
 
 **Why this matters:**
 - Every running container is **identical to what was tested**
-- Rollbacks are a single `docker compose up -d` with a previous image tag — no state to reconcile
+- Rollbacks are a one-line change (the image tag in `.env`) and a `docker compose up -d` — no state to reconcile — and the deploy does it automatically if a new image fails its health check
 - Deployment is deterministic and reproducible
 - Eliminates an entire class of runtime configuration drift
 
@@ -139,9 +143,10 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 
 ```
 .
+├── .github/workflows/      # CI/CD: build, smoke test, push, deploy
 ├── site/                   # Static site content (HTML, CSS, media)
 ├── scripts/                # Image optimizer (build stage) and post-build smoke test
-├── monitoring/             # Prometheus scrape config, alert rules, Grafana dashboard
+├── monitoring/             # Prometheus scrape config, alert rules, Grafana dashboard, firewall unit
 ├── default.conf            # NGINX server config (security headers, caching)
 ├── Dockerfile              # Multi-stage build: optimize images, then bake into NGINX
 ├── docker/
@@ -166,10 +171,10 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 
 ## CI/CD Pipeline
 
-Every push to `main` triggers a GitHub Actions workflow that:
+Every push to `main` that changes the site, the image, the NGINX config, the scripts or the Compose file triggers a GitHub Actions workflow that:
 
 1. Builds the Docker image (a build stage downsizes the photos, and every local asset URL in the HTML gets a content hash like `styles.css?v=1a2b3c4d5e`, so edits are never hidden by browser or Cloudflare caches; originals stay untouched in git)
-2. Smoke-tests the running container: security headers are present on real pages, the CSP allows the embedded video players, and cache headers are sane
+2. Smoke-tests the running container: security headers are present on real pages, the CSP allows the embedded video players, cache headers are sane, and the internal metrics endpoint is not reachable on the public port. It also checks that the Compose file is valid and that its third-party images can be pulled
 3. Pushes the image to Docker Hub, tagged with the git commit SHA (and `latest`)
 4. Connects the runner to the private Tailscale network
 5. SSHs into the home server, resets its git checkout to the deployed commit (so the compose file always matches the image; `.env` and `tunnel.env` are git-ignored and untouched), pulls the new image, and runs `docker compose up -d --wait`. If the health check fails it rolls back to the previous SHA
@@ -182,16 +187,15 @@ The server is never exposed to the public internet at any point in this process.
 
 ## Monitoring
 
-Prometheus and Grafana watch the site without any log pipeline: nginx metrics through an exporter container, tunnel health from `cloudflared`'s own metrics endpoint, and host metrics from `node_exporter`. nginx's metrics listener is internal-only (port 8080, never published or tunnelled), and CI fails if it ever answers on the public port. Scrape config, alert rules, a Grafana dashboard and setup steps are in [`monitoring/`](monitoring/README.md).
+Prometheus and Grafana watch the site without any log pipeline: nginx metrics through an exporter container, tunnel health from `cloudflared`'s own metrics endpoint, and host metrics from `node_exporter`. nginx's metrics listener is internal-only (port 8080, never published or tunnelled), and CI fails if it ever answers on the public port. The Docker-published metrics ports are limited to the Prometheus host by a small systemd unit. Scrape config, alert rules, a Grafana dashboard and setup steps are in [`monitoring/`](monitoring/README.md).
 
 ---
 
 ## Roadmap
 
 - [x] Run `cloudflared` as a Compose service alongside NGINX
-- [ ] Add multi-architecture image builds for ARM compatibility
 - [ ] GitOps-style deployment workflow
-- [ ] Automated rollback on failed health check post-deploy
+- [x] Automated rollback on failed health check post-deploy
 
 ---
 
