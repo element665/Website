@@ -93,23 +93,39 @@ jobs:
           envs: IMAGE_TAG
           script: |
             set -eu
-            cd /home/webadmin/Website/docker/
+            cd /home/webadmin/Website
 
-            # remember what is running now so we can go back to it
+            # Put the server's checkout on the exact commit being deployed, so docker-compose.yaml
+            # always matches the image. Hand edits to tracked files are discarded; untracked and
+            # git-ignored files (.env, tunnel.env) are not touched by reset --hard.
+            if ! git fetch --quiet origin main; then
+              echo "git fetch failed. On the server, 'git remote -v' in /home/webadmin/Website must show a reachable (https) remote." >&2
+              exit 1
+            fi
+            git reset --hard "${IMAGE_TAG}"
+            cd docker
+
+            # Remember what is running now so we can go back to it.
             PREV=$(sed -n 's/^IMAGE_TAG=//p' .env 2>/dev/null || true)
-            echo "IMAGE_TAG=${IMAGE_TAG}" > .env
 
+            # Pull first. IMAGE_TAG is already in this shell's environment and compose gives the
+            # environment priority over .env, so this fetches the new image. If the pull fails,
+            # nothing on the server has changed yet.
             docker compose pull
+
+            echo "IMAGE_TAG=${IMAGE_TAG}" > .env
             if docker compose up -d --wait; then
               echo "Deployed ${IMAGE_TAG}"
               # keep the last week of images around for quick rollbacks, drop the rest
               docker image prune -af --filter "until=168h"
             else
               echo "Health check failed for ${IMAGE_TAG}" >&2
-              if [ -n "${PREV}" ]; then
+              if [ -n "${PREV}" ] && [ "${PREV}" != "${IMAGE_TAG}" ]; then
                 echo "Rolling back to ${PREV}" >&2
                 echo "IMAGE_TAG=${PREV}" > .env
-                docker compose up -d --wait || true
+                # IMAGE_TAG must be overridden here: the new value is still exported in this shell
+                # and would otherwise win over the .env file, "rolling back" to the same bad image.
+                IMAGE_TAG="${PREV}" docker compose up -d --wait || true
               fi
               exit 1
             fi
