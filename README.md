@@ -141,6 +141,7 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 .
 ├── site/                   # Static site content (HTML, CSS, media)
 ├── scripts/                # Image optimizer (build stage) and post-build smoke test
+├── monitoring/             # Prometheus scrape config, alert rules, Grafana dashboard
 ├── default.conf            # NGINX server config (security headers, caching)
 ├── Dockerfile              # Multi-stage build: optimize images, then bake into NGINX
 ├── docker/
@@ -176,6 +177,12 @@ Every push to `main` triggers a GitHub Actions workflow that:
 Pull requests run steps 1-2 only. They never push an image or deploy.
 
 The server is never exposed to the public internet at any point in this process.
+
+---
+
+## Monitoring
+
+Prometheus and Grafana watch the site without any log pipeline: nginx metrics through an exporter container, tunnel health from `cloudflared`'s own metrics endpoint, and host metrics from `node_exporter`. nginx's metrics listener is internal-only (port 8080, never published or tunnelled), and CI fails if it ever answers on the public port. Scrape config, alert rules, a Grafana dashboard and setup steps are in [`monitoring/`](monitoring/README.md).
 
 ---
 

@@ -1,6 +1,7 @@
 .git
 .github
 docker
+monitoring
 README.md
 scripts/smoke-test.sh
 **/.DS_Store

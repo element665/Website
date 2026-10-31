@@ -68,6 +68,11 @@ for page in / /gear.html; do
   [ "$broken" -eq 0 ] && ok "$page: $(printf '%s\n' "$stamped" | wc -l | tr -d ' ') stamped URLs all return 200"
 done
 
+echo "Internal metrics endpoint is not reachable on the public port"
+code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/stub_status")
+leak=$(curl -s "$BASE/stub_status" | grep -c "Active connections" || true)
+if [ "$code" = 404 ] && [ "$leak" = 0 ]; then ok "/stub_status -> 404"; else bad "/stub_status answers on the public port (status $code)"; fi
+
 echo "Hidden files are not served"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/.DS_Store")
 case "$code" in 403|404) ok ".DS_Store -> $code" ;; *) bad ".DS_Store -> $code" ;; esac

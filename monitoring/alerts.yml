@@ -1,0 +1,77 @@
+# Prometheus alerting rules for the website. Load them with:
+#
+#   rule_files:
+#     - /etc/prometheus/rules/website-alerts.yml     # wherever you place this file
+#
+# Prometheus only EVALUATES these. Something has to deliver the notification: either run
+# Alertmanager, or recreate the important ones in Grafana (Alerting > Alert rules), using the
+# `expr` lines below as the query. See monitoring/README.md.
+#
+# None of this can notice that the whole homelab (power, internet, Proxmox) is down, because
+# Prometheus runs inside it. Add one external uptime check on the public URL for that.
+
+groups:
+  - name: website
+    rules:
+      - alert: WebsiteTunnelDisconnected
+        expr: cloudflared_tunnel_ha_connections{job="web-cloudflared"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cloudflare tunnel has no active connections"
+          description: "cloudflared on {{ $labels.instance }} is running but not connected to Cloudflare, so the public site is down."
+
+      - alert: WebsiteTunnelMetricsDown
+        expr: up{job="web-cloudflared"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "cloudflared metrics are unreachable"
+          description: "Prometheus cannot scrape cloudflared on {{ $labels.instance }}: the container is down, or a firewall rule is blocking port 2000."
+
+      - alert: WebsiteNginxDown
+        expr: nginx_up{job="web-nginx"} == 0 or up{job="web-nginx"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "nginx (or its exporter) is down"
+          description: "The nginx exporter on {{ $labels.instance }} cannot reach nginx, or Prometheus cannot reach the exporter."
+
+      - alert: WebsiteOriginErrors
+        expr: increase(cloudflared_tunnel_request_errors{job="web-cloudflared"}[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Tunnel is failing to proxy requests to nginx"
+          description: "cloudflared reported request errors towards the origin for 5+ minutes (usually a wrong tunnel route or nginx not answering)."
+
+      - alert: WebHostDown
+        expr: up{job="web-node"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Web VM metrics are unreachable"
+          description: "node_exporter on {{ $labels.instance }} cannot be scraped: the VM is down, or a firewall rule is blocking port 9100."
+
+      - alert: WebHostDiskAlmostFull
+        expr: node_filesystem_avail_bytes{job="web-node",fstype=~"ext4|xfs|btrfs"} / node_filesystem_size_bytes{job="web-node",fstype=~"ext4|xfs|btrfs"} < 0.20
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Web VM disk is over 80% full"
+          description: "{{ $labels.mountpoint }} on {{ $labels.instance }} has less than 20% free (old image layers and logs are the usual cause: docker system df)."
+
+      - alert: WebHostMemoryLow
+        expr: node_memory_MemAvailable_bytes{job="web-node"} / node_memory_MemTotal_bytes{job="web-node"} < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Web VM has less than 10% memory available"
+          description: "{{ $labels.instance }} is running low on memory."
