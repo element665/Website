@@ -56,6 +56,18 @@ n=$(headers_of /styles.css | grep -ci '^cache-control:' || true)
 cc=$(headers_of /styles.css | grep -i '^cache-control:' || true)
 case "$cc" in *immutable*) bad "CSS is marked immutable but filenames are not hashed" ;; *) ok "CSS is not immutable" ;; esac
 
+echo "Local asset URLs carry a content hash and resolve"
+for page in / /gear.html; do
+  stamped=$(curl -sS "$BASE$page" | grep -oE '(src|href)="\./[^"]+\?v=[0-9a-f]+"' | sed -E 's/^[a-z]+="\.//; s/"$//' | sort -u)
+  if [ -z "$stamped" ]; then bad "$page has no hash-stamped asset URLs"; continue; fi
+  broken=0
+  for u in $stamped; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE$u")
+    if [ "$code" != 200 ]; then bad "$page: $u -> $code"; broken=1; fi
+  done
+  [ "$broken" -eq 0 ] && ok "$page: $(printf '%s\n' "$stamped" | wc -l | tr -d ' ') stamped URLs all return 200"
+done
+
 echo "Hidden files are not served"
 code=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/.DS_Store")
 case "$code" in 403|404) ok ".DS_Store -> $code" ;; *) bad ".DS_Store -> $code" ;; esac

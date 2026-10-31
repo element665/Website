@@ -167,11 +167,11 @@ Real infrastructure work happens inside real budget constraints. Designing a sys
 
 Every push to `main` triggers a GitHub Actions workflow that:
 
-1. Builds the Docker image (a build stage downsizes the photos; originals stay untouched in git)
+1. Builds the Docker image (a build stage downsizes the photos, and every local asset URL in the HTML gets a content hash like `styles.css?v=1a2b3c4d5e`, so edits are never hidden by browser or Cloudflare caches; originals stay untouched in git)
 2. Smoke-tests the running container: security headers are present on real pages, the CSP allows the embedded video players, and cache headers are sane
 3. Pushes the image to Docker Hub, tagged with the git commit SHA (and `latest`)
 4. Connects the runner to the private Tailscale network
-5. SSHs into the home server, pins the new SHA, and runs `docker compose pull && docker compose up -d --wait`, rolling back to the previous SHA if the health check fails
+5. SSHs into the home server, resets its git checkout to the deployed commit (so the compose file always matches the image; `.env` and `tunnel.env` are git-ignored and untouched), pulls the new image, and runs `docker compose up -d --wait`. If the health check fails it rolls back to the previous SHA
 
 Pull requests run steps 1-2 only. They never push an image or deploy.
 
