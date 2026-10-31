@@ -9,6 +9,7 @@ on:
       - 'default.conf'
       - 'scripts/**'
       - '.dockerignore'
+      - 'docker/**'
   pull_request:
     branches: [ "main" ]
     paths:
@@ -17,6 +18,7 @@ on:
       - 'default.conf'
       - 'scripts/**'
       - '.dockerignore'
+      - 'docker/**'
   workflow_dispatch:
 
 permissions:
@@ -48,6 +50,16 @@ jobs:
         run: |
           docker run -d --name site-test -p 127.0.0.1:8080:80 website:test
           sh scripts/smoke-test.sh http://127.0.0.1:8080
+
+      - name: Internal metrics endpoint (stub_status) works
+        run: docker exec site-test wget -qO- http://127.0.0.1:8080/stub_status | grep -q "Active connections"
+
+      - name: Compose file is valid and third-party images exist
+        run: |
+          cp docker/tunnel.env.example docker/tunnel.env
+          cd docker
+          docker compose config -q
+          docker compose pull nginx-exporter cloudflared
 
       - name: Container logs (on failure)
         if: failure()

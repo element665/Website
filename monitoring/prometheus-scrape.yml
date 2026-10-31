@@ -1,0 +1,18 @@
+# Add these jobs under `scrape_configs:` in your existing prometheus.yml, then reload Prometheus.
+# Replace <WEB_VM_IP> with the web VM's LAN address. The job names are used by alerts.yml and by the
+# Grafana dashboard, so if you rename them, rename them there too.
+#
+# Ports: 9113 = nginx exporter (compose), 2000 = cloudflared metrics (compose), 9100 = node_exporter (apt).
+
+scrape_configs:
+  - job_name: web-nginx
+    static_configs:
+      - targets: ["<WEB_VM_IP>:9113"]
+
+  - job_name: web-cloudflared
+    static_configs:
+      - targets: ["<WEB_VM_IP>:2000"]
+
+  - job_name: web-node
+    static_configs:
+      - targets: ["<WEB_VM_IP>:9100"]

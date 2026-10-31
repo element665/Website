@@ -36,9 +36,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
-    # Prometheus: uncomment to scrape http://<this-vm>:2000/metrics from another host.
-    # ports:
-    #   - "2000:2000"
+    # Prometheus scrapes http://<this-vm>:2000/metrics. Docker-published ports bypass the host's
+    # INPUT firewall rules; see monitoring/README.md for how to restrict who can reach them.
+    ports:
+      - "2000:2000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx-exporter:
+    container_name: nginx-exporter
+    image: nginx/nginx-prometheus-exporter:1.5.1
+    # Reads nginx's internal stub_status (port 8080: not published, not routed by the tunnel) and
+    # serves Prometheus metrics on :9113. No healthcheck: this image is minimal and may have no shell.
+    command: --nginx.scrape-uri=http://site:8080/stub_status
+    restart: unless-stopped
+    depends_on:
+      site:
+        condition: service_healthy
+    ports:
+      - "9113:9113"
     logging:
       driver: json-file
       options:
