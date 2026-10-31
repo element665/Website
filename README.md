@@ -92,7 +92,7 @@ CI/CD deployment is handled over a private WireGuard-based overlay network using
 
 **Why this matters:**
 - Port 22 is never open to the public internet
-- The GitHub Actions runner joins the private network ephemerally for the duration of the deployment, then is automatically removed
+- The GitHub Actions runner joins the private network ephemerally for the duration of the deployment, then is automatically removed. It authenticates with a Tailscale OAuth client (no auth key that expires every 90 days) and joins as a tagged node (`tag:ci`), so the tailnet ACL can limit it to the web VM on port 22
 - SSH key authentication is enforced — no password auth
 - Eliminates an entire class of brute force exposure
 
