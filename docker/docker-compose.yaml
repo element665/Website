@@ -21,7 +21,7 @@ services:
 
   cloudflared:
     container_name: cloudflared
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.7
     # tunnel.env lives on the server only (git-ignored) and holds TUNNEL_TOKEN=... (see tunnel.env.example).
     # In the Cloudflare Zero Trust dashboard, the tunnel's public hostname must point at http://site:80
     env_file: tunnel.env
