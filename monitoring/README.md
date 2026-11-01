@@ -85,6 +85,6 @@ Prometheus alone only *evaluates* `alerts.yml`; it cannot send anything. Pick on
 
 ## What this does not cover
 
-- **The whole homelab being down.** Prometheus runs inside it, so a power or internet outage silences the alerts too. Add one external check on the public URL (UptimeRobot, Better Stack, or Cloudflare health checks) that notifies you by email or push.
+- **The whole homelab being down.** Prometheus runs inside it, so a power or internet outage silences these alerts too. The external checks cover that: UptimeRobot on the public URL, and Cloudflare's tunnel health emails.
 - **Status codes, top pages, countries, cache hit ratio.** nginx's `stub_status` and cloudflared's documented metrics don't have them, and there is no log pipeline. Cloudflare's own analytics (your domain > Analytics) already shows requests, countries, cache ratio and status codes without anything on your server. Check whether your cloudflared version also exposes `cloudflared_tunnel_response_by_code` (`curl -s localhost:2000/metrics | grep response_by_code`); if it does, it is easy to add a panel for it.
 - **Per-container CPU and memory.** That needs cAdvisor, which this setup doesn't include. The host-level panels cover the VM as a whole.
