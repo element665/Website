@@ -48,7 +48,7 @@ services:
 
   nginx-exporter:
     container_name: nginx-exporter
-    image: nginx/nginx-prometheus-exporter:1.5.1
+    image: nginx/nginx-prometheus-exporter:1.5.3
     # Reads nginx's internal stub_status (port 8080: not published, not routed by the tunnel) and
     # serves Prometheus metrics on :9113. No healthcheck: this image is minimal and may have no shell.
     command: --nginx.scrape-uri=http://site:8080/stub_status
