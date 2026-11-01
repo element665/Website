@@ -1,0 +1,24 @@
+# Dependabot opens a pull request when a pinned dependency has a newer release. CI builds and
+# smoke-tests every PR, and nothing deploys until the PR is merged to main.
+version: 2
+updates:
+  # Actions used by the workflows (actions/checkout, docker/*, tailscale/github-action, ...)
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base images in the Dockerfile (alpine, nginx)
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+
+  # Images in the Compose file (cloudflared, nginx-prometheus-exporter)
+  - package-ecosystem: docker-compose
+    directory: /docker
+    schedule:
+      interval: weekly

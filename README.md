@@ -187,6 +187,7 @@ Prometheus and Grafana stay metrics-only on purpose: there is no log pipeline to
 ```
 .
 ├── .github/workflows/      # CI/CD: build, smoke test, push, deploy
+├── .github/dependabot.yml  # Weekly update PRs for base images, Compose images and Actions
 ├── site/                   # Static site content (HTML, CSS, media)
 ├── scripts/                # Image optimizer (build stage) and post-build smoke test
 ├── monitoring/             # Prometheus scrape config, alert rules, Grafana dashboard, firewall unit
@@ -194,6 +195,7 @@ Prometheus and Grafana stay metrics-only on purpose: there is no log pipeline to
 ├── Dockerfile              # Multi-stage build: optimize images, then bake into NGINX
 ├── docker/
 │   └── docker-compose.yaml # Compose service definition (lives on the server too)
+├── docs/runbook.md         # Reboot test checklist and dependency update process
 └── README.md
 ```
 
